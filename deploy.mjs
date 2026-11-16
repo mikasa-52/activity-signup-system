@@ -58,10 +58,6 @@ async function api(pathname, { method = 'GET', body, accept = 'application/vnd.g
   return data;
 }
 
-function b64(str) {
-  return Buffer.from(str, 'utf8').toString('base64');
-}
-
 (async function main() {
   const log = (...a) => console.log(...a);
 
@@ -137,37 +133,78 @@ function b64(str) {
     process.exit(1);
   }
 
-  /* 3. 上传文件（已存在则带 sha 覆盖，实现增量更新） */
-  log('▶ 3/6 上传静态文件 …');
+  /* 3. 一次性提交所有文件（Git Data API：单 commit 触发单次构建）
+        说明：若逐文件用 Contents API 提交，会产生 N 个 commit、触发 N 次 Pages 构建，
+              密集提交容易让队列出现 "Page build failed" 中间态错误，故统一走 tree/commit。 */
+  log('▶ 3/6 提交静态文件（单次提交）…');
+
+  const payloadFiles = [];
   for (const file of FILES) {
     const full = path.resolve(file);
-    if (!fs.existsSync(full)) {
-      log('   跳过缺失文件：' + file);
-      continue;
-    }
-    const content = fs.readFileSync(full, 'utf8');
-    const filePath = '/repos/' + owner + '/' + finalName + '/contents/' + encodeURIComponent(file);
-
-    // 取已有文件的 sha，存在则视为更新
-    let sha = null;
-    try {
-      const cur = await api(filePath + '?ref=main');
-      sha = cur && cur.sha;
-    } catch (e) {
-      if (e.status !== 404) throw e;
-    }
-
-    const body = {
-      message: (sha ? 'update ' : 'add ') + file,
-      content: b64(content),
-      branch: 'main'
-    };
-    if (sha) body.sha = sha;
-
-    await api(filePath, { method: 'PUT', body });
-    log('   ✓ ' + file + '（' + content.length + ' 字符' + (sha ? '，已覆盖旧版本' : '，新增') + '）');
-    await sleep(300);
+    if (!fs.existsSync(full)) { log('   跳过缺失文件：' + file); continue; }
+    // .nojekyll 为空文件，blob API 不接受空内容，写入一个换行以保证文件存在
+    const content = fs.readFileSync(full, 'utf8') || '\n';
+    payloadFiles.push({ path: file, content });
   }
+
+  // 3.1 取现有 main 引用（新仓库为空时不存在）
+  let baseCommitSha = null;
+  let baseTreeSha = null;
+  try {
+    const ref = await api('/repos/' + owner + '/' + finalName + '/git/ref/heads/main');
+    baseCommitSha = ref.object.sha;
+    const baseCommit = await api('/repos/' + owner + '/' + finalName + '/git/commits/' + baseCommitSha);
+    baseTreeSha = baseCommit.tree.sha;
+    log('   基于现有提交：' + baseCommitSha.slice(0, 7));
+  } catch (e) {
+    if (e.status !== 404 && e.status !== 409) throw e;
+    log('   空仓库，将创建首个提交');
+  }
+
+  // 3.2 逐个文件建 blob
+  const treeItems = [];
+  for (const f of payloadFiles) {
+    const blob = await api('/repos/' + owner + '/' + finalName + '/git/blobs', {
+      method: 'POST',
+      body: { content: f.content, encoding: 'utf-8' }
+    });
+    treeItems.push({ path: f.path, mode: '100644', type: 'blob', sha: blob.sha });
+    log('   ✓ ' + f.path + '（' + f.content.length + ' 字符）');
+  }
+
+  // 3.3 建 tree
+  const treeBody = { tree: treeItems };
+  if (baseTreeSha) treeBody.base_tree = baseTreeSha;
+  const tree = await api('/repos/' + owner + '/' + finalName + '/git/trees', {
+    method: 'POST',
+    body: treeBody
+  });
+
+  // 3.4 建 commit
+  const commit = await api('/repos/' + owner + '/' + finalName + '/git/commits', {
+    method: 'POST',
+    body: {
+      message: 'deploy: 聚场 GatherHub 在线活动报名管理系统\n\n' +
+        '纯前端原型（活动列表 / 详情报名 / 我的报名 / 管理后台）\n' +
+        '静态资源：' + payloadFiles.map(f => f.path).join('、'),
+      tree: tree.sha,
+      parents: baseCommitSha ? [baseCommitSha] : []
+    }
+  });
+
+  // 3.5 更新或创建 main 引用
+  if (baseCommitSha) {
+    await api('/repos/' + owner + '/' + finalName + '/git/refs/heads/main', {
+      method: 'PATCH',
+      body: { sha: commit.sha, force: false }
+    });
+  } else {
+    await api('/repos/' + owner + '/' + finalName + '/git/refs', {
+      method: 'POST',
+      body: { ref: 'refs/heads/main', sha: commit.sha }
+    });
+  }
+  log('   ✓ 已提交 ' + commit.sha.slice(0, 7) + '（单 commit，仅触发一次 Pages 构建）');
 
   /* 4. 开启 GitHub Pages（main 分支根目录） */
   log('▶ 4/6 开启 GitHub Pages …');
@@ -203,19 +240,27 @@ function b64(str) {
   log('▶ 5/6 等待 Pages 构建 …（最多约 3 分钟）');
 
   let built = false;
+  let erroredStreak = 0;
   if (pagesEnabled) {
     for (let i = 0; i < 20; i++) {
       await sleep(9000);
       try {
         const p = await api('/repos/' + owner + '/' + finalName + '/pages');
         const st = p.status || 'null';
-        log('   [' + (i + 1) + '/20] 构建状态：' + st + (p.html_url ? ' | ' + p.html_url : ''));
+        log('   [' + (i + 1) + '/20] 构建状态：' + st);
         if (st === 'built') { built = true; break; }
-        if (st === 'errored') { log('   ⚠️ 构建报错，请到仓库 Actions 查看日志'); break; }
+        if (st === 'errored') {
+          erroredStreak++;
+          if (erroredStreak === 1) log('   ⚠️ 当前构建报错，继续等待后续构建（可能仍在队列中）…');
+          if (erroredStreak >= 6) { log('   ❌ 连续多次构建失败，请到仓库 Actions 查看日志'); break; }
+        } else {
+          erroredStreak = 0;
+        }
       } catch (e) {
         log('   查询状态失败：' + e.status);
       }
     }
+    if (!built && !erroredStreak) log('   ⏱ 等待超时，构建可能仍在排队');
   }
 
   /* 6. 验证可访问性 */
