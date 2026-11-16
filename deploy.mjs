@@ -22,7 +22,7 @@ const API = 'https://api.github.com';
 const TOKEN = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
 const REPO_NAME = process.env.REPO_NAME || 'activity-signup-system';
 
-const FILES = ['index.html', 'styles.css', 'app.js', 'README.md', '.nojekyll', 'deploy.mjs'];
+const FILES = ['index.html', 'styles.css', 'app.js', 'README.md', '.nojekyll', '.gitignore', 'deploy.mjs'];
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 

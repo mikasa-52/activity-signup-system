@@ -1,0 +1,15 @@
+# 项目数据与记忆（不纳入版本控制）
+.workbuddy/
+
+# 依赖与临时目录
+node_modules/
+.devcheck/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 日志
+*.log
+npm-debug.log*
