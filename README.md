@@ -101,13 +101,14 @@ npx serve .
 └── README.md
 ```
 
-## 七、GitHub Pages 地址
+## 七、在线预览地址
 
-<!-- 部署完成后替换下面的占位地址 -->
+**预览地址：<https://mikasa-52.github.io/activity-signup-system/>**
+（已部署并通过 HTTP 200 验证）
 
-```
-https://<your-github-username>.github.io/activity-signup-system/
-```
+仓库地址：<https://github.com/mikasa-52/activity-signup-system>
+
+**Pages 配置**：`Settings → Pages` → Source `Deploy from a branch` → 分支 `main` → 目录 `/ (root)` → 保存后约 1 分钟生效。
 
 ### 部署方式一：网页手动配置（最省事）
 
