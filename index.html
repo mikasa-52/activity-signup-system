@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="聚场 · 在线活动报名管理系统，纯前端演示原型。支持活动浏览、在线报名、我的报名、管理后台。">
+<meta name="theme-color" content="#4f46e5">
+<title>聚场 · 在线活动报名管理系统</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Cpath d='M9 12h14M9 16h10M9 20h6' stroke='%23fff' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip-link" href="#app">跳到主要内容</a>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a class="brand" href="#/list" aria-label="聚场，返回活动列表">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+          <path d="M4 7h16M4 12h11M4 17h7"></path>
+        </svg>
+      </span>
+      <span class="brand-name">聚场<em>GatherHub</em></span>
+    </a>
+
+    <button class="nav-toggle" id="navToggle" type="button" aria-expanded="false" aria-controls="mainNav" aria-label="打开导航菜单">
+      <span></span><span></span><span></span>
+    </button>
+
+    <nav class="main-nav" id="mainNav" aria-label="主导航">
+      <a href="#/list" data-nav="list">活动列表</a>
+      <a href="#/my" data-nav="my">我的报名</a>
+      <a href="#/admin" data-nav="admin">管理后台</a>
+    </nav>
+
+    <div class="role-switch" role="group" aria-label="切换演示角色">
+      <button type="button" data-role="user">普通用户</button>
+      <button type="button" data-role="admin">管理员</button>
+    </div>
+  </div>
+</header>
+
+<main id="app" class="app" tabindex="-1"></main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <p class="footer-copy">聚场 GatherHub · 纯前端演示原型 · 所有数据仅保存在当前浏览器的 localStorage</p>
+    <button type="button" class="link-btn" id="resetDemo">重置演示数据</button>
+  </div>
+</footer>
+
+<div class="toast-stack" id="toastStack" aria-live="polite"></div>
+<div class="layer-root" id="layerRoot"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
